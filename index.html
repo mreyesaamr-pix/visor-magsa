@@ -537,7 +537,35 @@ const BASEKEYS=new Set(BD.map(r=>String(r[0])));let DB=null,admin=false,edits={}
 function applyBd(){const l=[];BD.forEach(r=>{const k=String(r[0]);if(!dels[k])l.push(mkBd(edits[k]||r))});Object.keys(edits).forEach(k=>{if(!BASEKEYS.has(k)&&!dels[k])l.push(mkBd(edits[k]))});bdRows.length=0;l.forEach(r=>bdRows.push(r));finish(bdRows);maps.bd.refresh();if(curTab==='res')renderRes();if(curTab==='cal')renderCal();qBadge()}
 function sub(){DB.collection('bd_edits').onSnapshot(s=>{edits={};s.docs.forEach(d=>{const v=d.data().v;if(Array.isArray(v)&&v.length===17)edits[d.id]=v});applyBd()},()=>{});
  DB.collection('bd_del').onSnapshot(s=>{dels={};s.docs.forEach(d=>dels[d.id]=1);applyBd()},()=>{})}
-(async()=>{if(window.claude){try{const[d,u]=await Promise.all([claude.use('db'),claude.use('user')]);DB=d;admin=!!(d&&u&&await u.canEdit())}catch(e){}}
+/* ---- edición sin Claude: un editor publica ediciones.json en GitHub; los demás lo ven en solo lectura ---- */
+const GH={repo:'mreyesaamr-pix/visor-magsa',file:'ediciones.json',branch:'main'};
+const ghTok=()=>{try{return localStorage.getItem('magsa-gh')||''}catch(e){return''}};
+let dirty=false;
+const saveDraft=()=>{try{localStorage.setItem('magsa-draft',JSON.stringify({edits,dels}))}catch(e){}};
+const updPub=()=>{const b=$('#pub');if(b){const n=Object.keys(edits).length+Object.keys(dels).length;b.textContent=dirty?'⬆ Publicar cambios':'✔ Publicado';b.classList.toggle('on',dirty);b.title=n+' registros con cambios respecto a la base original'}};
+const mark=()=>{dirty=true;saveDraft();applyBd();updPub()};
+const localDB={doc(p){const[c,id]=p.split('/');return{set:async d=>{if(c==='bd_edits')edits[id]=d.v;else dels[id]=1;mark()},delete:async()=>{if(c==='bd_edits')delete edits[id];else delete dels[id];mark()}}},collection(){return{onSnapshot(){}}}};
+async function publishEd(){const tok=ghTok();if(!tok)throw new Error('Falta la clave de GitHub');
+ const url='https://api.github.com/repos/'+GH.repo+'/contents/'+GH.file,H={Authorization:'Bearer '+tok,Accept:'application/vnd.github+json'};
+ let sha;const g=await fetch(url+'?ref='+GH.branch+'&t='+Date.now(),{headers:H,cache:'no-store'});if(g.ok)sha=(await g.json()).sha;else if(g.status!==404)throw new Error('GitHub respondió '+g.status+' (revisa la clave)');
+ const body=JSON.stringify({edits,dels,updated:new Date().toISOString()});
+ const p=await fetch(url,{method:'PUT',headers:H,body:JSON.stringify({message:'Actualización de la BD desde el visor',content:btoa(unescape(encodeURIComponent(body))),sha,branch:GH.branch})});
+ if(!p.ok){let m='';try{m=(await p.json()).message}catch(e){}throw new Error('No se pudo publicar ('+p.status+') '+m)}
+ dirty=false;saveDraft();updPub()}
+function edDlg(){const ov=$('#ov');const on=!!ghTok();
+ ov.innerHTML='<div class="dlg" style="max-width:460px"><h3>Modo editor</h3>'+(on?'<p style="margin:0 0 10px;font-size:13px;color:var(--mu)">Los cambios se guardan en este dispositivo y se ven para todos al pulsar <b>Publicar cambios</b>.</p><div class="bt"><button class="ex">Salir del modo editor</button><button class="cn">Cerrar</button></div>':'<p style="margin:0 0 10px;font-size:13px;color:var(--mu)">Pega la clave de GitHub del editor (token con permiso de escritura en «Contents» del repositorio). Se guarda solo en este dispositivo.</p><label style="display:grid;gap:3px;font-size:11px;color:var(--mu);text-transform:uppercase">Clave de GitHub<input id="ghk" type="password" autocomplete="off" placeholder="github_pat_…"></label><div class="bt"><button class="sv">Activar y recargar</button><button class="cn">Cancelar</button></div>')+'<div class="er"></div></div>';
+ ov.style.display='flex';$('.cn',ov).onclick=()=>{ov.style.display='none'};
+ const sv=$('.sv',ov);if(sv)sv.onclick=()=>{const k=$('#ghk',ov).value.trim();if(!k)return;try{localStorage.setItem('magsa-gh',k);location.reload()}catch(e){$('.er',ov).textContent='Este navegador no permite guardar la clave.'}};
+ const ex=$('.ex',ov);if(ex)ex.onclick=()=>{try{localStorage.removeItem('magsa-gh');localStorage.removeItem('magsa-draft')}catch(e){}location.reload()}}
+async function localBoot(){
+ try{const r=await fetch(GH.file+'?t='+Date.now(),{cache:'no-store'});if(r.ok){const j=await r.json();edits={};Object.keys(j.edits||{}).forEach(k=>{if(Array.isArray(j.edits[k])&&j.edits[k].length===17)edits[k]=j.edits[k]});dels=j.dels||{}}}catch(e){}
+ if(ghTok()){try{const d=JSON.parse(localStorage.getItem('magsa-draft')||'null');if(d){edits=d.edits||{};dels=d.dels||{};dirty=true}}catch(e){}admin=true;DB=localDB;
+  $('#role').insertAdjacentHTML('afterend','<button id="pub" class="adm" style="border:1px solid #ffc400;background:transparent;color:#ffc400;padding:7px 14px;border-radius:8px;cursor:pointer;font:inherit"></button>');
+  $('#pub').onclick=async()=>{const b=$('#pub');if(!dirty)return toast('No hay cambios pendientes');b.disabled=true;toast('Publicando…');try{await publishEd();toast('Publicado. Los demás usuarios lo verán en 1–2 minutos')}catch(e){toast(e.message||'No se pudo publicar')}b.disabled=false};
+  updPub()}
+ $('#role').style.cursor='pointer';$('#role').onclick=()=>{if(!window.claude)edDlg()};
+ applyBd()}
+(async()=>{if(!window.claude)await localBoot();if(window.claude){try{const[d,u]=await Promise.all([claude.use('db'),claude.use('user')]);DB=d;admin=!!(d&&u&&await u.canEdit())}catch(e){}}
  document.body.classList.toggle('admin',admin);const rl=$('#role');rl.textContent=admin?'✏️ Modo editor':'👁 Solo lectura';rl.classList.toggle('on',admin);if(DB)sub()})();
 const ov=$('#ov'),DL=[1,2,5,6,7,8,9,12,13,14,16];
 function openEdit(r){const isNew=!r,v=r?r.raw.slice():BDH.map(()=>'');if(isNew)v[6]='Norte';
