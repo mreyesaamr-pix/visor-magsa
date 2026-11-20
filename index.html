@@ -620,13 +620,27 @@ document.addEventListener('click',e=>{if(e.target.closest&&e.target.closest('#bu
 (async()=>{if(!window.claude)await localBoot();if(window.claude){try{const[d,u]=await Promise.all([claude.use('db'),claude.use('user')]);DB=d;admin=!!(d&&u&&await u.canEdit())}catch(e){}}
  document.body.classList.toggle('admin',admin);const rl=$('#role');rl.textContent=admin?'✏️ Modo editor':'👁 Solo lectura';rl.classList.toggle('on',admin);if(DB)sub()})();
 const ov=$('#ov'),DL=[1,2,5,6,7,8,9,12,13,14,16];
+function ubiHier(){const H={},add=(d,p,t)=>{d=String(d||'').trim();p=String(p||'').trim();t=String(t||'').trim();if(!d)return;const kd=d.toUpperCase(),D=H[kd]||(H[kd]={n:d,p:{}});if(!p)return;const kp=p.toUpperCase(),P=D.p[kp]||(D.p[kp]={n:p,d:new Set()});if(t)P.d.add(t.toUpperCase())};
+ bdRows.forEach(x=>add(x.raw[1],x.raw[2],x.raw[3]));CPP.rows.forEach(r=>add(CPP.D[r[3]],CPP.P[r[4]],CPP.T[r[5]]));return H}
+function nextSincod(){let m=0;const f=k=>{const x=/^SINCOD(\d+)$/i.exec(String(k));if(x)m=Math.max(m,parseInt(x[1],10))};bdRows.forEach(x=>f(x.key));Object.keys(edits||{}).forEach(f);return 'SINCOD'+String(m+1).padStart(3,'0')}
 function openEdit(r){const isNew=!r,v=r?r.raw.slice():BDH.map(()=>'');if(isNew)v[6]='Norte';
- const dls=DL.map(i=>'<datalist id="dl'+i+'">'+uniq(bdRows.map(x=>x.raw[i]).filter(Boolean)).map(x=>'<option value="'+esc(x)+'">').join('')+'</datalist>').join('');
+ const dls=DL.map(i=>'<datalist id="dl'+i+'">'+(i===1||i===2||i===3?'':uniq(bdRows.map(x=>x.raw[i]).filter(Boolean)).map(x=>'<option value="'+esc(x)+'">').join(''))+'</datalist>').join('');
  ov.innerHTML='<div class="dlg"><h3>'+(isNew?'Nuevo registro':'Editar: '+esc(r.n))+'</h3><div class="fg">'+BDH.map((h,i)=>'<label>'+esc(h)+'<input data-i="'+i+'" value="'+esc(v[i]??'')+'"'+(DL.includes(i)?' list="dl'+i+'"':'')+(i===0&&!isNew?' readonly':'')+'></label>').join('')+'</div>'+dls+'<div class="er"></div><div class="bt"><button class="sv">Guardar</button><button class="cn">Cancelar</button>'+(!isNew&&edits[r.key]&&BASEKEYS.has(r.key)?'<button class="rs">Restaurar original</button>':'')+(!isNew?'<button class="dx">Eliminar</button>':'')+'</div></div>';
  ov.style.display='flex';const $o=s=>ov.querySelector(s),err=m=>$o('.er').textContent=m,close=()=>ov.style.display='none';
  $o('.cn').onclick=close;
+ const nk=x=>String(x||'').trim().toUpperCase(),hier=ubiHier(),inp=i=>$o('[data-i="'+i+'"]');
+ const fill=(i,arr)=>{$o('#dl'+i).innerHTML=uniq(arr).map(x=>'<option value="'+esc(x)+'">').join('')};
+ const upd=()=>{const d=nk(inp(1).value),p=nk(inp(2).value);
+  fill(1,Object.keys(hier).map(k=>hier[k].n));
+  const dd=d&&hier[d];fill(2,dd?Object.keys(dd.p).map(k=>dd.p[k].n):Object.keys(hier).flatMap(k=>Object.keys(hier[k].p).map(q=>hier[k].p[q].n)));
+  const pp=dd&&p&&dd.p[p];fill(3,pp?[...pp.d]:(dd?Object.keys(dd.p).flatMap(q=>[...dd.p[q].d]):[]))};
+ inp(1).addEventListener('input',()=>{const d=nk(inp(1).value);if(hier[d]&&inp(2).value&&!hier[d].p[nk(inp(2).value)]){inp(2).value='';inp(3).value=''}upd()});
+ inp(2).addEventListener('input',()=>{const d=nk(inp(1).value),p=nk(inp(2).value);if(hier[d]&&hier[d].p[p]&&inp(3).value&&!hier[d].p[p].d.has(inp(3).value.trim().toUpperCase()))inp(3).value='';upd()});
+ upd();
+ if(isNew)inp(0).placeholder='Vacío = '+nextSincod();
  $o('.sv').onclick=async()=>{const nv=BDH.map((h,i)=>$o('[data-i="'+i+'"]').value.trim());
-  if(!nv[0]||!nv[4])return err('Cód. postal y BARRIO son obligatorios.');
+  if(isNew&&!nv[0])nv[0]=nextSincod();
+  if(!nv[0]||!nv[4])return err('BARRIO es obligatorio.');
   if(!/^[A-Za-z0-9_.~:@+-]+$/.test(nv[0]))return err('El código postal solo admite letras y números.');
   if(isNew&&bdRows.some(x=>x.key===nv[0]))return err('Ya existe un registro con ese código postal.');
   for(const i of [10,11]){if(nv[i]===''){nv[i]=null;continue}const n=parseFloat(nv[i].replace(',','.'));if(!isFinite(n))return err(BDH[i]+' no es un número válido.');nv[i]=n}
