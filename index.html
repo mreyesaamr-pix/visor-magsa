@@ -59,7 +59,8 @@ canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none;cursor
 .xm button{display:block;width:100%;text-align:left;background:none;border:0;color:var(--tx);padding:9px 12px;cursor:pointer;font:inherit;border-radius:6px}.xm button:hover{background:var(--acs)}
 .ov{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;z-index:30;padding:12px}
 .dlg{background:var(--sf);color:var(--tx);border-radius:12px;border-top:4px solid var(--ac);padding:16px;max-width:780px;width:100%;max-height:92vh;overflow:auto}
-.dlg h3{margin:0 0 12px}.fg{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px}.fg label{display:grid;gap:3px;font-size:11px;color:var(--mu);text-transform:uppercase}
+.dlg h3{margin:0 0 12px}.fg{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px}.fg input::placeholder{color:var(--mu);opacity:.8}
+.fg label{display:grid;gap:3px;font-size:11px;color:var(--mu);text-transform:uppercase}
 .er{color:var(--wn);min-height:18px;margin:8px 0 4px;font-weight:600}.bt{display:flex;gap:8px;flex-wrap:wrap}
 .bt button{padding:9px 16px;border-radius:8px;border:1px solid var(--bd);background:var(--bg);color:var(--tx);cursor:pointer;font:inherit}
 .bt .sv{background:var(--ac);color:var(--act);border-color:var(--ac);font-weight:700}.bt .dx{color:var(--wn);border-color:var(--wn);margin-left:auto}
@@ -619,7 +620,7 @@ function bulkPrev(R,fname){const ov=$('#ov'),c=R.cnt;
 document.addEventListener('click',e=>{if(e.target.closest&&e.target.closest('#bulk'))bulkDlg()});
 (async()=>{if(!window.claude)await localBoot();if(window.claude){try{const[d,u]=await Promise.all([claude.use('db'),claude.use('user')]);DB=d;admin=!!(d&&u&&await u.canEdit())}catch(e){}}
  document.body.classList.toggle('admin',admin);const rl=$('#role');rl.textContent=admin?'✏️ Modo editor':'👁 Solo lectura';rl.classList.toggle('on',admin);if(DB)sub()})();
-const ov=$('#ov'),DL=[1,2,5,6,7,8,9,12,13,14,16];
+const ov=$('#ov'),DL=[1,2,3,5,6,7,8,9,12,13,14,16];
 function ubiHier(){const H={},add=(d,p,t)=>{d=String(d||'').trim();p=String(p||'').trim();t=String(t||'').trim();if(!d)return;const kd=d.toUpperCase(),D=H[kd]||(H[kd]={n:d,p:{}});if(!p)return;const kp=p.toUpperCase(),P=D.p[kp]||(D.p[kp]={n:p,d:new Set()});if(t)P.d.add(t.toUpperCase())};
  bdRows.forEach(x=>add(x.raw[1],x.raw[2],x.raw[3]));CPP.rows.forEach(r=>add(CPP.D[r[3]],CPP.P[r[4]],CPP.T[r[5]]));return H}
 function nextSincod(){let m=0;const f=k=>{const x=/^SINCOD(\d+)$/i.exec(String(k));if(x)m=Math.max(m,parseInt(x[1],10))};bdRows.forEach(x=>f(x.key));Object.keys(edits||{}).forEach(f);return 'SINCOD'+String(m+1).padStart(3,'0')}
@@ -629,15 +630,15 @@ function openEdit(r){const isNew=!r,v=r?r.raw.slice():BDH.map(()=>'');if(isNew)v
  ov.style.display='flex';const $o=s=>ov.querySelector(s),err=m=>$o('.er').textContent=m,close=()=>ov.style.display='none';
  $o('.cn').onclick=close;
  const nk=x=>String(x||'').trim().toUpperCase(),hier=ubiHier(),inp=i=>$o('[data-i="'+i+'"]');
- const fill=(i,arr)=>{$o('#dl'+i).innerHTML=uniq(arr).map(x=>'<option value="'+esc(x)+'">').join('')};
+ const fill=(i,arr)=>{const el=$o('#dl'+i);if(!el)return;el.innerHTML=uniq(arr).map(x=>'<option value="'+esc(x)+'">').join('')};
  const upd=()=>{const d=nk(inp(1).value),p=nk(inp(2).value);
   fill(1,Object.keys(hier).map(k=>hier[k].n));
   const dd=d&&hier[d];fill(2,dd?Object.keys(dd.p).map(k=>dd.p[k].n):Object.keys(hier).flatMap(k=>Object.keys(hier[k].p).map(q=>hier[k].p[q].n)));
   const pp=dd&&p&&dd.p[p];fill(3,pp?[...pp.d]:(dd?Object.keys(dd.p).flatMap(q=>[...dd.p[q].d]):[]))};
  inp(1).addEventListener('input',()=>{const d=nk(inp(1).value);if(hier[d]&&inp(2).value&&!hier[d].p[nk(inp(2).value)]){inp(2).value='';inp(3).value=''}upd()});
  inp(2).addEventListener('input',()=>{const d=nk(inp(1).value),p=nk(inp(2).value);if(hier[d]&&hier[d].p[p]&&inp(3).value&&!hier[d].p[p].d.has(inp(3).value.trim().toUpperCase()))inp(3).value='';upd()});
+ if(isNew){inp(0).placeholder='Vacío = '+nextSincod();inp(0).style.setProperty('--ph','1')}
  upd();
- if(isNew)inp(0).placeholder='Vacío = '+nextSincod();
  $o('.sv').onclick=async()=>{const nv=BDH.map((h,i)=>$o('[data-i="'+i+'"]').value.trim());
   if(isNew&&!nv[0])nv[0]=nextSincod();
   if(!nv[0]||!nv[4])return err('BARRIO es obligatorio.');
