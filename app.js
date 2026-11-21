@@ -84,9 +84,9 @@ const hav=(a,b,c,d)=>{const t=x=>x*Math.PI/180,h=Math.sin(t(c-a)/2)**2+Math.cos(
 const ofName=s=>String(s||'—').replace(/^DISTRIBUIDOR MAGSA\s*-\s*/i,'');
 const PAL=['#0072B2','#E69F00','#009E73','#CC79A7','#D55E00','#56B4E9','#6C4AB6'],GR='#8a8a8a';
 const tipoOf=r=>{const s=r.raw[13]||'';if(/NO CONTAMOS/.test(s))return'Sin entrega';if(/^A DOMICILIO\s*\/\s*RECOJO/.test(s))return'Domicilio / recojo';if(/^A DOMICILIO/.test(s))return'A domicilio';if(/AGENCIA/.test(s))return'Recojo en agencia';if(/PUNTO|PARADERO|COLECTIVO/.test(s))return'Punto coordinado';return'Otro'};
-const TIPO=[['A domicilio','#009E73'],['Domicilio / recojo','#56B4E9'],['Recojo en agencia','#0072B2'],['Punto coordinado','#E69F00'],['Sin entrega','#D55E00'],['Otro',GR]];
+const TIPO=[['A domicilio','#009E73'],['Domicilio / recojo','#56B4E9'],['Recojo en agencia','#0072B2'],['Punto coordinado','#E69F00'],['Sin entrega','#FF1744'],['Otro',GR]];
 const freqOf=r=>{const s=norm(r.raw[12]||'');if(/no habilitada/.test(s))return'Sin servicio';if(/^s1/.test(s))return'Variable por semana';if(/^diaria/.test(s))return'Diaria';if(/interdiaria/.test(s))return'Interdiaria';const n=(s.match(/lunes|martes|miercoles|jueves|viernes|sabado|domingo/g)||[]).length;return n>=2?'2 a 4 días/semana':'1 día/semana'};
-const FREQ=[['Diaria','#009E73'],['Interdiaria','#56B4E9'],['2 a 4 días/semana','#0072B2'],['1 día/semana','#E69F00'],['Variable por semana','#CC79A7'],['Sin servicio','#D55E00']];
+const FREQ=[['Diaria','#009E73'],['Interdiaria','#56B4E9'],['2 a 4 días/semana','#0072B2'],['1 día/semana','#E69F00'],['Variable por semana','#CC79A7'],['Sin servicio','#FF1744']];
 function catDef(mode,rows){
  if(mode==='zona')return{o:[['Ciudad principal','#0072B2'],['Zona alejada','#E69F00']],f:r=>r.raw[7]==='C.PRINCIPAL'?'Ciudad principal':'Zona alejada'};
  if(mode==='freq')return{o:FREQ,f:freqOf};
