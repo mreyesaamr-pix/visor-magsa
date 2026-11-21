@@ -115,27 +115,55 @@ function renderTable(){const a=rsRows(),H=[['k','Grupo'],['n','Barrios'],['dom',
  const arr=c=>rsS[0]===c?(rsS[1]<0?' ▼':' ▲'):'';
  $('#rtb').innerHTML='<table class="gt"><thead><tr>'+H.map(h=>'<th data-s="'+h[0]+'"'+(h[0]!=='k'&&h[0]!=='pc'?' class="n"':'')+'>'+h[1]+arr(h[0])+'</th>').join('')+'</tr></thead><tbody>'+
   a.map((o,i)=>{const w=x=>(100*x/o.n).toFixed(2)+'%';
-   return'<tr class="rw" data-i="'+i+'"><td><b>'+esc(o.k)+'</b></td><td class="n">'+o.n.toLocaleString('es')+'</td><td class="n">'+o.dom+' <small>('+PC(o.dom,o.n)+')</small></td><td class="n">'+o.age+'</td><td class="n">'+o.pun+'</td><td class="n">'+(o.sin?'<b style="color:var(--wn)">'+o.sin+'</b>':'0')+'</td><td><div class="sb" title="A domicilio '+o.dom+' · Agencia '+o.age+' · Punto coord. '+o.pun+' · Sin entrega '+o.sin+'"><i style="width:'+w(o.dom)+';background:#009E73"></i><i style="width:'+w(o.age)+';background:#0072B2"></i><i style="width:'+w(o.pun)+';background:#E69F00"></i><i style="width:'+w(o.sin)+';background:#D55E00"></i></div></td></tr>'}).join('')+'</tbody></table>';
+   return'<tr class="rw" data-i="'+i+'"><td><b>'+esc(o.k)+'</b></td><td class="n">'+o.n.toLocaleString('es')+'</td><td class="n">'+o.dom+' <small>('+PC(o.dom,o.n)+')</small></td><td class="n">'+o.age+'</td><td class="n">'+o.pun+'</td><td class="n">'+(o.sin?'<b style="color:var(--wn)">'+o.sin+'</b>':'0')+'</td><td><div class="sb" title="A domicilio '+o.dom+' · Agencia '+o.age+' · Punto coord. '+o.pun+' · Sin entrega '+o.sin+'"><i style="width:'+w(o.dom)+';background:#009E73"></i><i style="width:'+w(o.age)+';background:#0072B2"></i><i style="width:'+w(o.pun)+';background:#E69F00"></i><i style="width:'+w(o.sin)+';background:#FF1744"></i></div></td></tr>'}).join('')+'</tbody></table>';
  const tb=$('#rtb');tb.onclick=e=>{const th=e.target.closest('th[data-s]');if(th){const c=th.dataset.s;rsS=rsS[0]===c?[c,-rsS[1]]:[c,c==='k'?1:-1];return renderTable()}
   const tr=e.target.closest('tr.rw');if(tr)goBd(a[+tr.dataset.i].f)}}
 function renderRes(){const R=bdRows,T=R.length,tp=r=>r._t||(r._t=tipoOf(r));
  const dom=R.filter(r=>/^(A domicilio|Domicilio)/.test(tp(r))).length,age=R.filter(r=>tp(r)==='Recojo en agencia').length,sin=R.filter(r=>tp(r)==='Sin entrega').length,pun=T-dom-age-sin,
   alej=R.filter(r=>r.raw[7]!=='C.PRINCIPAL').length,ofs=new Set(R.map(r=>ofName(r.of)).filter(x=>x!=='--'&&x!=='—')).size,
   dis=new Set(R.map(r=>r.d+'|'+r.p+'|'+r.t)).size,prv=new Set(R.map(r=>r.d+'|'+r.p)).size,dep=new Set(R.map(r=>r.d)).size;
- const tile=(l,v,s,c)=>'<div class="tile'+(c?' '+c:'')+'"><small>'+l+'</small><strong>'+v+'</strong><em>'+s+'</em></div>';
- $('#t-res').innerHTML='<div class="pg"><h2 class="pgt">Resumen de cobertura</h2><p class="pgs">Calculado sobre la BD actual del visor, incluidas las ediciones guardadas.</p><div class="kp">'+
-  tile('Barrios en la base',T.toLocaleString('es'),dep+' departamentos · '+prv+' provincias · '+dis+' distritos')+
-  tile('Entrega a domicilio',dom.toLocaleString('es'),PC(dom,T)+' de los barrios')+
-  tile('Recojo en agencia',age.toLocaleString('es'),PC(age,T)+' de los barrios')+
-  tile('Punto coordinado',pun.toLocaleString('es'),PC(pun,T)+' de los barrios')+
-  tile('Sin entrega',sin.toLocaleString('es'),PC(sin,T)+' · zona no habilitada','bad')+
-  tile('Zonas alejadas',alej.toLocaleString('es'),PC(alej,T)+' · el resto es ciudad principal')+
-  tile('Oficinas de reparto',ofs,'distribuidores con barrios asignados')+
+ const tile=(l,v,s,c,k)=>'<div class="tile'+(c?' '+c:'')+(k?' dd':'')+'"'+(k?' data-k="'+k+'" title="Doble clic para ver el detalle"':'')+'><small>'+l+'</small><strong>'+v+'</strong><em>'+s+'</em></div>';
+ $('#t-res').innerHTML='<div class="pg"><h2 class="pgt">Resumen de cobertura</h2><p class="pgs">Calculado sobre la BD actual del visor, incluidas las ediciones guardadas. Haz doble clic en una tarjeta para ver el detalle y descargarlo en Excel.</p><div class="kp">'+
+  tile('Barrios en la base',T.toLocaleString('es'),dep+' departamentos · '+prv+' provincias · '+dis+' distritos','','all')+
+  tile('Entrega a domicilio',dom.toLocaleString('es'),PC(dom,T)+' de los barrios','','dom')+
+  tile('Recojo en agencia',age.toLocaleString('es'),PC(age,T)+' de los barrios','','age')+
+  tile('Punto coordinado',pun.toLocaleString('es'),PC(pun,T)+' de los barrios','','pun')+
+  tile('Sin entrega',sin.toLocaleString('es'),PC(sin,T)+' · zona no habilitada','bad','sin')+
+  tile('Zonas alejadas',alej.toLocaleString('es'),PC(alej,T)+' · el resto es ciudad principal','','alej')+
+  tile('Oficinas de reparto',ofs,'distribuidores con barrios asignados','','ofs')+
   '</div><div class="rsh"><label>Agrupar por<select id="rg">'+Object.entries(GRP).map(([k,v])=>'<option value="'+k+'"'+(k===rsG?' selected':'')+'>'+v[0]+'</option>').join('')+'</select></label><label>Filtrar<input id="rf" type="search" placeholder="Escribe para filtrar…" value="'+esc(rsF)+'" autocomplete="off"></label><button id="rcsv">⬇ Descargar CSV</button></div><div class="tw" id="rtb"></div><p class="pgs" style="margin-left:0;margin-top:10px">Toca una fila para ver ese grupo en el mapa. “A domicilio” incluye “A domicilio/recojo”. Verde: domicilio · Azul: agencia · Naranja: punto coordinado · Rojo: sin entrega.</p></div>';
  $('#rg').onchange=e=>{rsG=e.target.value;renderTable()};
  $('#rf').oninput=e=>{rsF=e.target.value;renderTable()};
  $('#rcsv').onclick=()=>{const a=rsRows();saveFile('Resumen_cobertura_'+GRP[rsG][0].replace(/\s+/g,'_')+'_'+stamp()+'.csv',csvOf([[GRP[rsG][0],'Barrios','A domicilio','Recojo en agencia','Punto coordinado','Sin entrega','% a domicilio']].concat(a.map(o=>[o.k,o.n,o.dom,o.age,o.pun,o.sin,PC(o.dom,o.n)]))))};
+ const kp=$('#t-res .kp');let lt=0,lk='';
+ kp.ondblclick=e=>{const t=e.target.closest('.tile[data-k]');if(t){e.preventDefault();resDetail(t.dataset.k)}};
+ kp.addEventListener('touchend',e=>{const t=e.target.closest('.tile[data-k]');if(!t)return;const n=Date.now();if(lk===t.dataset.k&&n-lt<350){e.preventDefault();lt=0;resDetail(t.dataset.k)}else{lt=n;lk=t.dataset.k}});
  renderTable()}
+/* detalle de cada tarjeta del resumen, con descarga a Excel */
+const RSD={all:['Barrios en la base',r=>true],dom:['Entrega a domicilio',r=>/^(A domicilio|Domicilio)/.test(tipoOf(r))],age:['Recojo en agencia',r=>tipoOf(r)==='Recojo en agencia'],
+ pun:['Punto coordinado',r=>!/^(A domicilio|Domicilio|Recojo en agencia|Sin entrega)/.test(tipoOf(r))],sin:['Sin entrega (zona no habilitada)',r=>tipoOf(r)==='Sin entrega'],alej:['Zonas alejadas',r=>r.raw[7]!=='C.PRINCIPAL'],ofs:['Oficinas de reparto',null]};
+function resDetail(k){const D=RSD[k];if(!D)return;const ov=$('#ov');let H,rows,xl,lim=400;
+ if(k==='ofs'){const m=new Map();bdRows.forEach(r=>{const o=ofName(r.of);if(o==='--'||o==='—')return;let x=m.get(o);if(!x)m.set(o,x={o,n:0,dom:0,age:0,pun:0,sin:0,dep:new Set()});const t=tipoOf(r);x.n++;x.dep.add(r.d);
+   if(/^(A domicilio|Domicilio)/.test(t))x.dom++;else if(t==='Recojo en agencia')x.age++;else if(t==='Sin entrega')x.sin++;else x.pun++});
+  H=['Oficina de reparto','Barrios','A domicilio','Recojo en agencia','Punto coordinado','Sin entrega','Departamentos'];
+  rows=[...m.values()].sort((a,b)=>b.n-a.n||a.o.localeCompare(b.o,'es')).map(x=>[x.o,x.n,x.dom,x.age,x.pun,x.sin,[...x.dep].sort().join(', ')]);xl=()=>[H].concat(rows)}
+ else{const R=bdRows.filter(D[1]).sort((a,b)=>a.d.localeCompare(b.d,'es')||a.p.localeCompare(b.p,'es')||a.t.localeCompare(b.t,'es')||String(a.n).localeCompare(String(b.n),'es'));
+  H=['Cod Postal','Barrio','Departamento','Provincia','Distrito','Tipo de entrega','Frecuencia','Repartidor o agencia','Zona'];
+  rows=R.map(r=>[r.raw[0],r.n,r.d,r.p,r.t,r.raw[13],r.raw[12],r.raw[14],r.raw[7]]);
+  xl=()=>[BDH].concat(R.map(r=>r.raw.map((x,i)=>i===0&&/^\d+$/.test(x)?Number(x):x)))}
+ ov.innerHTML='<div class="dlg" style="max-width:1100px"><h3 style="margin:0 0 4px">'+esc(D[0])+'</h3><p style="margin:0 0 10px;font-size:13px;color:var(--mu)"><b class="rdn"></b> · el Excel incluye todas las filas'+(k==='ofs'?'':' con todas las columnas de la BD')+'.</p>'
+  +'<div class="bt" style="flex-wrap:wrap;margin:0 0 10px;align-items:center"><input class="rdf" type="search" placeholder="Filtrar…" autocomplete="off" style="flex:1;min-width:160px;padding:7px 10px;border:1px solid var(--bd);border-radius:8px;background:var(--bg);color:var(--tx);font:inherit"><button class="rdx">⬇ Descargar Excel</button><button class="cn">Cerrar</button></div>'
+  +'<div class="tw" style="max-height:62vh;overflow:auto"><table class="gt rdt"><thead><tr>'+H.map((h,i)=>'<th'+(k==='ofs'&&i>0&&i<6?' class="n"':'')+'>'+esc(h)+'</th>').join('')+'</tr></thead><tbody class="rdb"></tbody></table></div><p class="rdm" style="font-size:12px;color:var(--mu);margin:6px 0 0"></p></div>';
+ ov.style.display='flex';const fi=$('.rdf',ov);
+ const draw=()=>{const f=norm(fi.value),a=f?rows.filter(r=>r.some(c=>norm(c??'').includes(f))):rows;
+  $('.rdn',ov).textContent=(f?a.length.toLocaleString('es')+' de ':'')+rows.length.toLocaleString('es')+(k==='ofs'?' oficinas':' barrios');
+  $('.rdb',ov).innerHTML=a.slice(0,lim).map(r=>'<tr>'+r.map((c,i)=>'<td'+(k==='ofs'&&i>0&&i<6?' class="n"':'')+'>'+esc(c??'')+'</td>').join('')+'</tr>').join('');
+  $('.rdm',ov).textContent=a.length>lim?'Se muestran las primeras '+lim+' filas; filtra para ver otras o descarga el Excel.':''};
+ fi.oninput=draw;draw();
+ $('.cn',ov).onclick=()=>{ov.style.display='none'};
+ $('.rdx',ov).onclick=async()=>{toast('Preparando Excel…');try{await loadX()}catch(e){return toast('No se pudo cargar el módulo de Excel')}
+  const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(xl()),'Detalle');
+  saveFile('Resumen_'+D[0].replace(/\s*\(.*\)/,'').replace(/\s+/g,'_')+'_'+stamp()+'.xlsx',XLSX.write(wb,{bookType:'xlsx',type:'array'}))}}
 
 /* ---- calidad de datos ---- */
 let DCm=null;
