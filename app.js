@@ -13,9 +13,10 @@ const uniq=a=>[...new Set(a)].sort((x,y)=>x.localeCompare(y,'es'));
 const cl=(v,a,b)=>Math.min(b,Math.max(a,v));
 const wx=l=>(l+180)/360,wy=l=>{const r=l*Math.PI/180;return(1-Math.log(Math.tan(r)+1/Math.cos(r))/Math.PI)/2};
 /* ---- datos ---- */
+const fmtLL=(la,lo)=>typeof la==='number'&&typeof lo==='number'&&isFinite(la)&&isFinite(lo)?(+la.toFixed(6))+', '+(+lo.toFixed(6)):'';
 const mkBd=r=>({key:String(r[0]),raw:r,n:r[4],d:r[1],p:r[2],t:r[3],la:r[10],lo:r[11],zona:r[7],cp:r[0],
  sub:r[3]+' · '+r[2]+' · '+r[1]+' · CP '+r[0],
- cards:[['Frecuencia de reparto',r[12]],['Tipo de reparto',r[13]],['Repartidor o agencia',r[14]],['Contacto',r[15]],['Cód. postal',r[0]],['Zona',r[7]]],
+ cards:[['Frecuencia de reparto',r[12]],['Tipo de reparto',r[13]],['Repartidor o agencia',r[14]],['Contacto',r[15]],['Cód. postal',r[0]],['Zona',r[7]],['Coordenadas',fmtLL(r[10],r[11])]],
  chips:['CNS: '+r[8],'CF: '+r[9],'Asistente: '+r[16],'Repartidor: '+r[5]],
  bad:/NO CONTAMOS|NO HABILITADA/.test(r[13]+r[12]),of:r[14]||'—'});const bdRows=BD.map(mkBd);
 const cppRows=CPP.rows.map(r=>({n:r[1],d:CPP.D[r[3]],p:CPP.P[r[4]],t:CPP.T[r[5]],la:r[7],lo:r[8],
