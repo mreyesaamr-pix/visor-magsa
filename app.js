@@ -166,40 +166,59 @@ function resDetail(k){const D=RSD[k];if(!D)return;const ov=$('#ov');let H,rows,x
   saveFile('Resumen_'+D[0].replace(/\s*\(.*\)/,'').replace(/\s+/g,'_')+'_'+stamp()+'.xlsx',XLSX.write(wb,{bookType:'xlsx',type:'array'}))}}
 
 /* ---- calidad de datos ---- */
-let DCm=null;
+let DCm=null,qOk={};/* hallazgos marcados como conformes: 'revisión|cod' -> {s:detalle,t:fecha}; se publican en ediciones.json */
+const qk=(c,i)=>c.id+'|'+i[0].key,qIsOk=(c,i)=>{const o=qOk[qk(c,i)];return !!o&&o.s===String(i[1])};
 function distC(){if(DCm)return DCm;DCm=new Map();const nd=CPP.D.map(norm),np=CPP.P.map(norm),nt=CPP.T.map(norm),g=new Map();
  CPP.rows.forEach(r=>{const k=nd[r[3]]+'|'+np[r[4]]+'|'+nt[r[5]];let a=g.get(k);if(!a)g.set(k,a=[[],[]]);a[0].push(r[7]);a[1].push(r[8])});
  const md=a=>{a.sort((x,y)=>x-y);return a[a.length>>1]};g.forEach((a,k)=>DCm.set(k,[md(a[0]),md(a[1])]));return DCm}
 function qChecks(){const R=bdRows,DC=distC(),hasC=r=>typeof r.la==='number'&&typeof r.lo==='number'&&isFinite(r.la)&&isFinite(r.lo),vac=v=>v==null||/^[\s-]*$/.test(String(v));
  const C=[];
- C.push({t:'Sin coordenadas',sev:'alta',d:'No se pueden ubicar en el mapa ni calcular cercanía.',items:R.filter(r=>!hasC(r)).map(r=>[r,'Latitud o longitud vacía o no numérica'])});
- C.push({t:'Coordenadas fuera del Perú',sev:'alta',d:'Latitud o longitud fuera del rango del país: probable error de signo o de digitación.',items:R.filter(r=>hasC(r)&&(r.la>1||r.la<-19||r.lo>-68||r.lo<-82)).map(r=>[r,r.la+', '+r.lo])});
+ C.push({id:'sinc',t:'Sin coordenadas',sev:'alta',d:'No se pueden ubicar en el mapa ni calcular cercanía.',items:R.filter(r=>!hasC(r)).map(r=>[r,'Latitud o longitud vacía o no numérica'])});
+ C.push({id:'fuera',t:'Coordenadas fuera del Perú',sev:'alta',d:'Latitud o longitud fuera del rango del país: probable error de signo o de digitación.',items:R.filter(r=>hasC(r)&&(r.la>1||r.la<-19||r.lo>-68||r.lo<-82)).map(r=>[r,r.la+', '+r.lo])});
  const far=[];R.forEach(r=>{if(!hasC(r))return;const c=DC.get(norm(r.d)+'|'+norm(r.p)+'|'+norm(r.t));if(!c)return;const km=hav(r.la,r.lo,c[0],c[1]);if(km>30)far.push([r,'A '+Math.round(km)+' km del centro de los centros poblados de su distrito',km])});
  far.sort((a,b)=>b[2]-a[2]);
- C.push({t:'Coordenada lejos de su distrito (más de 30 km)',sev:'media',d:'Distancia al centro de los centros poblados del distrito según INEI. En distritos muy extensos puede ser correcto; conviene revisar.',items:far});
+ C.push({id:'lejos',t:'Coordenada lejos de su distrito (más de 30 km)',sev:'media',d:'Distancia al centro de los centros poblados del distrito según INEI. En distritos muy extensos puede ser correcto; conviene revisar.',items:far});
  const cc=new Map();R.forEach(r=>{if(hasC(r)){const k=r.la+','+r.lo;(cc.get(k)||cc.set(k,[]).get(k)).push(r)}});
  const sh=[];cc.forEach(a=>{if(a.length>=3)a.forEach(r=>sh.push([r,'Comparte la misma coordenada con '+(a.length-1)+' barrios más']))});
- C.push({t:'Misma coordenada en 3 o más barrios',sev:'media',d:'Suele indicar una coordenada de relleno (por ejemplo, la del distrito) en lugar de la del barrio.',items:sh});
+ C.push({id:'misma',t:'Misma coordenada en 3 o más barrios',sev:'media',d:'Suele indicar una coordenada de relleno (por ejemplo, la del distrito) en lugar de la del barrio.',items:sh});
  const nm=new Map();R.forEach(r=>{const k=norm(r.n)+'|'+norm(r.d)+'|'+norm(r.p)+'|'+norm(r.t);(nm.get(k)||nm.set(k,[]).get(k)).push(r)});
  const dp=[];nm.forEach(a=>{if(a.length>1)a.forEach(r=>dp.push([r,'Nombre repetido ×'+a.length+' en el mismo distrito']))});
- C.push({t:'Nombre repetido en el mismo distrito',sev:'baja',d:'Pueden ser barrios distintos con el mismo nombre; verifica que cada uno tenga su propia ubicación.',items:dp});
- C.push({t:'Con servicio pero sin contacto',sev:'media',d:'Barrios con entrega o recojo cuyo campo Contacto está vacío o es “--”.',items:R.filter(r=>!r.bad&&vac(r.raw[15])).map(r=>[r,'Contacto vacío'])});
- C.push({t:'Con servicio pero sin repartidor o agencia',sev:'media',d:'Barrios con servicio cuyo campo Repartidor o Agencia está vacío o es “--”.',items:R.filter(r=>!r.bad&&vac(r.raw[14])).map(r=>[r,'Repartidor o agencia vacío'])});
- C.push({t:'Tipo de entrega y frecuencia no coinciden',sev:'media',d:'Uno dice que no hay entrega y el otro indica una frecuencia de reparto (o al revés).',items:R.filter(r=>/NO CONTAMOS/.test(r.raw[13]||'')!==/NO HABILITADA/.test(r.raw[12]||'')).map(r=>[r,(r.raw[13]||'—')+' / '+(r.raw[12]||'—')])});
- C.push({t:'Distrito no reconocido en la base INEI',sev:'baja',d:'La combinación departamento, provincia y distrito no existe en la hoja CPP Perú: revisa la ortografía.',items:R.filter(r=>!DC.has(norm(r.d)+'|'+norm(r.p)+'|'+norm(r.t))).map(r=>[r,r.d+' › '+r.p+' › '+r.t])});
+ C.push({id:'nomrep',t:'Nombre repetido en el mismo distrito',sev:'baja',d:'Pueden ser barrios distintos con el mismo nombre; verifica que cada uno tenga su propia ubicación.',items:dp});
+ C.push({id:'sincon',t:'Con servicio pero sin contacto',sev:'media',d:'Barrios con entrega o recojo cuyo campo Contacto está vacío o es “--”.',items:R.filter(r=>!r.bad&&vac(r.raw[15])).map(r=>[r,'Contacto vacío'])});
+ C.push({id:'sinrep',t:'Con servicio pero sin repartidor o agencia',sev:'media',d:'Barrios con servicio cuyo campo Repartidor o Agencia está vacío o es “--”.',items:R.filter(r=>!r.bad&&vac(r.raw[14])).map(r=>[r,'Repartidor o agencia vacío'])});
+ C.push({id:'tipfre',t:'Tipo de entrega y frecuencia no coinciden',sev:'media',d:'Uno dice que no hay entrega y el otro indica una frecuencia de reparto (o al revés).',items:R.filter(r=>/NO CONTAMOS/.test(r.raw[13]||'')!==/NO HABILITADA/.test(r.raw[12]||'')).map(r=>[r,(r.raw[13]||'—')+' / '+(r.raw[12]||'—')])});
+ C.push({id:'distnr',t:'Distrito no reconocido en la base INEI',sev:'baja',d:'La combinación departamento, provincia y distrito no existe en la hoja CPP Perú: revisa la ortografía.',items:R.filter(r=>!DC.has(norm(r.d)+'|'+norm(r.p)+'|'+norm(r.t))).map(r=>[r,r.d+' › '+r.p+' › '+r.t])});
+C.forEach(c=>{const p=[],k=[];c.items.forEach(i=>(qIsOk(c,i)?k:p).push(i));c.all=c.items.length;c.items=p;c.ok=k});
  return C}
 function qBadge(){const el=$('#calb');if(!el)return;const n=qChecks().filter(c=>c.items.length&&c.sev!=='baja').length;el.textContent=n||'';el.style.display=n?'inline-block':'none';el.title=n+' revisiones con hallazgos'}
 function renderCal(){const C=qChecks(),T=bdRows.length,bad=new Set();C.forEach(c=>c.sev!=='baja'&&c.items.forEach(i=>bad.add(i[0].key)));
- const con=C.filter(c=>c.items.length).length,tile=(l,v,s,c)=>'<div class="tile'+(c?' '+c:'')+'"><small>'+l+'</small><strong>'+v+'</strong><em>'+s+'</em></div>';
- $('#t-cal').innerHTML='<div class="pg"><h2 class="pgt">Calidad de datos</h2><p class="pgs">Revisión automática de la BD actual. Se recalcula cuando se guardan ediciones.</p><div class="kp">'+
+ const adm=(()=>{try{return admin}catch(e){return false}})(),host=$('#t-cal'),wasOpen={},scr={};host.querySelectorAll('details.ck[data-id]').forEach(d=>{wasOpen[d.dataset.id]=d.open;const w=d.querySelector('.tw');if(w)scr[d.dataset.id]=w.scrollTop});
+ const nOk=C.reduce((a,c)=>a+c.ok.length,0),con=C.filter(c=>c.items.length).length,tile=(l,v,s,c)=>'<div class="tile'+(c?' '+c:'')+'"><small>'+l+'</small><strong>'+v+'</strong><em>'+s+'</em></div>';
+ const fd=t=>{try{return new Date(t).toLocaleDateString('es',{day:'2-digit',month:'short',year:'numeric'})}catch(e){return''}};
+ const row=(c,i,ok)=>{const q=esc(qk(c,i)),o=ok&&qOk[qk(c,i)];return '<tr'+(ok?' class="qd"':'')+'><td><b>'+esc(i[0].n)+'</b><br><small>'+esc(i[0].sub)+'</small></td><td>'+esc(i[1])+(ok?'<br><small class="qdt">✓ Conforme'+(o&&o.t?' · '+fd(o.t):'')+'</small>':'')+'</td><td class="n"><span class="qa">'+(adm?(ok?'<button class="unb" data-q="'+q+'" title="Volver a pendientes">↺ Deshacer</button>':'<button class="okb" data-q="'+q+'" title="Revisado y conforme: sale de pendientes">✓ Conforme</button>'):'')+'<button class="vb" data-k="'+esc(i[0].key)+'">Ver</button></span></td></tr>'};
+ const cnt=c=>c.items.length?'<i class="ct">'+c.items.length.toLocaleString('es')+'</i>':'<i class="ct ok">'+(c.ok.length?'✓ todo conforme':'✓ sin hallazgos')+'</i>';
+ const open=c=>c.id in wasOpen?wasOpen[c.id]:!!(c.items.length&&c.sev!=='baja');
+ host.innerHTML='<div class="pg"><h2 class="pgt">Calidad de datos</h2><p class="pgs">Revisión automática de la BD actual. Se recalcula cuando se guardan ediciones.'+(adm?' Marca <b>✓ Conforme</b> en cada hallazgo que revisaste y está bien: sale de pendientes. Luego pulsa <b>Publicar cambios</b> para que lo vean todos.':'')+'</p><div class="kp">'+
   tile('Barrios revisados',T.toLocaleString('es'),C.length+' revisiones automáticas')+
-  tile('Con observaciones importantes',bad.size.toLocaleString('es'),PC(bad.size,T)+' (severidad alta o media)',bad.size?'bad':'')+
-  tile('Revisiones con hallazgos',con+' de '+C.length,con?'abre cada una para ver el detalle':'todo en orden')+
+  tile('Con observaciones importantes',bad.size.toLocaleString('es'),PC(bad.size,T)+' (severidad alta o media, pendientes)',bad.size?'bad':'')+
+  tile('Revisiones con pendientes',con+' de '+C.length,con?'abre cada una para ver el detalle':'todo en orden')+
+  tile('Marcados conforme',nOk.toLocaleString('es'),nOk?'ya revisados y validados':'aún ninguno')+
   '</div><div class="rsh"><button id="qcsv">⬇ CSV de hallazgos</button></div>'+
-  C.map(c=>'<details class="ck"'+(c.items.length&&c.sev!=='baja'?' open':'')+'><summary><span class="sv '+c.sev+'">'+c.sev+'</span><b>'+esc(c.t)+'</b><i class="ct'+(c.items.length?'':' ok')+'">'+(c.items.length?c.items.length.toLocaleString('es'):'✓ sin hallazgos')+'</i></summary><p>'+esc(c.d)+'</p>'+
-   (c.items.length?'<div class="tw"><table class="gt"><tbody>'+c.items.slice(0,200).map(i=>'<tr><td><b>'+esc(i[0].n)+'</b><br><small>'+esc(i[0].sub)+'</small></td><td>'+esc(i[1])+'</td><td class="n"><button class="vb" data-k="'+esc(i[0].key)+'">Ver</button></td></tr>').join('')+'</tbody></table></div>'+(c.items.length>200?'<p class="pgs">Mostrando 200 de '+c.items.length.toLocaleString('es')+'. El CSV incluye todos.</p>':''):'')+'</details>').join('')+'</div>';
- $('#t-cal').onclick=e=>{const b=e.target.closest('.vb');if(b){show('bd');maps.bd.focus(b.dataset.k)}};
- $('#qcsv').onclick=()=>{const o=[['Revisión','Severidad','Cód. postal','Barrio','Distrito','Provincia','Departamento','Detalle']];C.forEach(c=>c.items.forEach(i=>o.push([c.t,c.sev,i[0].key,i[0].n,i[0].t,i[0].p,i[0].d,i[1]])));saveFile('Calidad_datos_MAGSA_'+stamp()+'.csv',csvOf(o))};
+  C.map(c=>'<details class="ck" data-id="'+c.id+'"'+(open(c)?' open':'')+'><summary><span class="sv '+c.sev+'">'+c.sev+'</span><b>'+esc(c.t)+'</b>'+cnt(c)+'</summary><p>'+esc(c.d)+'</p>'+
+   (c.items.length?'<div class="tw"><table class="gt"><tbody>'+c.items.slice(0,200).map(i=>row(c,i,0)).join('')+'</tbody></table></div>'+(c.items.length>200?'<p class="pgs">Mostrando 200 de '+c.items.length.toLocaleString('es')+'. El CSV incluye todos.</p>':''):'')+
+   (adm&&c.items.length>1?'<div class="qbar"><button class="okall" data-c="'+c.id+'">✓ Marcar los '+c.items.length.toLocaleString('es')+' como conforme</button></div>':'')+
+   (c.ok.length?'<details class="qok"><summary>✓ '+c.ok.length.toLocaleString('es')+' marcado'+(c.ok.length===1?'':'s')+' conforme · ver</summary>'+(adm&&c.ok.length>1?'<div class="qbar"><button class="unall" data-c="'+c.id+'">↺ Devolver los '+c.ok.length.toLocaleString('es')+' a pendientes</button></div>':'')+'<div class="tw"><table class="gt"><tbody>'+c.ok.slice(0,500).map(i=>row(c,i,1)).join('')+'</tbody></table></div></details>':'')+'</details>').join('')+'</div>';
+ host.querySelectorAll('details.ck[data-id]').forEach(d=>{const w=d.querySelector('.tw');if(w&&scr[d.dataset.id])w.scrollTop=scr[d.dataset.id]});
+ const det=new Map();C.forEach(c=>c.items.concat(c.ok).forEach(i=>det.set(qk(c,i),String(i[1]))));
+ const qSave=()=>{dirty=true;saveDraft();updPub();renderCal()};
+ host.onclick=e=>{const b=e.target.closest('button');if(!b)return;
+  if(b.classList.contains('vb')){show('bd');maps.bd.focus(b.dataset.k);return}
+  if(!adm)return;const now=new Date().toISOString();
+  if(b.classList.contains('okb')){const q=b.dataset.q;if(det.has(q)){qOk[q]={s:det.get(q),t:now};qSave();toast('Marcado conforme')}}
+  else if(b.classList.contains('unb')){delete qOk[b.dataset.q];qSave();toast('Vuelve a pendientes')}
+  else if(b.classList.contains('okall')){const c=C.find(x=>x.id===b.dataset.c);if(c&&confirm('¿Marcar los '+c.items.length+' hallazgos de «'+c.t+'» como conformes?')){c.items.forEach(i=>qOk[qk(c,i)]={s:String(i[1]),t:now});qSave()}}
+  else if(b.classList.contains('unall')){const c=C.find(x=>x.id===b.dataset.c);if(c){c.ok.forEach(i=>delete qOk[qk(c,i)]);qSave()}}};
+ $('#qcsv').onclick=()=>{const o=[['Revisión','Severidad','Estado','Cód. postal','Barrio','Distrito','Provincia','Departamento','Detalle']];C.forEach(c=>[[c.items,'Pendiente'],[c.ok,'Conforme']].forEach(([L,st])=>L.forEach(i=>o.push([c.t,c.sev,st,i[0].key,i[0].n,i[0].t,i[0].p,i[0].d,i[1]]))));saveFile('Calidad_datos_MAGSA_'+stamp()+'.csv',csvOf(o))};
  qBadge()}
 setTimeout(qBadge,500);
 
@@ -426,14 +445,14 @@ function sub(){DB.collection('bd_edits').onSnapshot(s=>{edits={};s.docs.forEach(
 const GH={repo:'mreyesaamr-pix/visor-magsa',file:'ediciones.json',branch:'main'};
 const ghTok=()=>{try{return localStorage.getItem('magsa-gh')||''}catch(e){return''}};
 let dirty=false;
-const saveDraft=()=>{try{localStorage.setItem('magsa-draft',JSON.stringify({edits,dels}))}catch(e){}};
-const updPub=()=>{const b=$('#pub');if(b){const n=Object.keys(edits).length+Object.keys(dels).length;b.textContent=dirty?'⬆ Publicar cambios':'✔ Publicado';b.classList.toggle('on',dirty);b.title=n+' registros con cambios respecto a la base original'}};
+const saveDraft=()=>{try{localStorage.setItem('magsa-draft',JSON.stringify({edits,dels,oks:qOk}))}catch(e){}};
+const updPub=()=>{const b=$('#pub');if(b){const n=Object.keys(edits).length+Object.keys(dels).length,nq=Object.keys(qOk).length;b.textContent=dirty?'⬆ Publicar cambios':'✔ Publicado';b.classList.toggle('on',dirty);b.title=n+' registros con cambios respecto a la base original'+(nq?' · '+nq+' hallazgos marcados conforme':'')}};
 const mark=()=>{dirty=true;saveDraft();applyBd();updPub()};
 const localDB={doc(p){const[c,id]=p.split('/');return{set:async d=>{if(c==='bd_edits')edits[id]=d.v;else dels[id]=1;mark()},delete:async()=>{if(c==='bd_edits')delete edits[id];else delete dels[id];mark()}}},collection(){return{onSnapshot(){}}}};
 async function publishEd(){const tok=ghTok();if(!tok)throw new Error('Falta la clave de GitHub');
  const url='https://api.github.com/repos/'+GH.repo+'/contents/'+GH.file,H={Authorization:'Bearer '+tok,Accept:'application/vnd.github+json'};
  let sha;const g=await fetch(url+'?ref='+GH.branch+'&t='+Date.now(),{headers:H,cache:'no-store'});if(g.ok)sha=(await g.json()).sha;else if(g.status!==404)throw new Error('GitHub respondió '+g.status+' (revisa la clave)');
- const body=JSON.stringify({edits,dels,updated:new Date().toISOString()});
+ const body=JSON.stringify({edits,dels,oks:qOk,updated:new Date().toISOString()});
  const p=await fetch(url,{method:'PUT',headers:H,body:JSON.stringify({message:'Actualización de la BD desde el visor',content:btoa(unescape(encodeURIComponent(body))),sha,branch:GH.branch})});
  if(!p.ok){let m='';try{m=(await p.json()).message}catch(e){}throw new Error('No se pudo publicar ('+p.status+') '+m)}
  dirty=false;saveDraft();updPub()}
@@ -443,8 +462,8 @@ function edDlg(){const ov=$('#ov');const on=!!ghTok();
  const sv=$('.sv',ov);if(sv)sv.onclick=()=>{const k=$('#ghk',ov).value.trim();if(!k)return;try{localStorage.setItem('magsa-gh',k);location.reload()}catch(e){$('.er',ov).textContent='Este navegador no permite guardar la clave.'}};
  const ex=$('.ex',ov);if(ex)ex.onclick=()=>{try{localStorage.removeItem('magsa-gh');localStorage.removeItem('magsa-draft')}catch(e){}location.reload()}}
 async function localBoot(){
- try{const r=await fetch(GH.file+'?t='+Date.now(),{cache:'no-store'});if(r.ok){const j=await r.json();edits={};Object.keys(j.edits||{}).forEach(k=>{if(Array.isArray(j.edits[k])&&j.edits[k].length===17)edits[k]=j.edits[k]});dels=j.dels||{}}}catch(e){}
- if(ghTok()){try{const d=JSON.parse(localStorage.getItem('magsa-draft')||'null');if(d){edits=d.edits||{};dels=d.dels||{};dirty=true}}catch(e){}admin=true;DB=localDB;
+ try{const r=await fetch(GH.file+'?t='+Date.now(),{cache:'no-store'});if(r.ok){const j=await r.json();edits={};Object.keys(j.edits||{}).forEach(k=>{if(Array.isArray(j.edits[k])&&j.edits[k].length===17)edits[k]=j.edits[k]});dels=j.dels||{};qOk=(j.oks&&typeof j.oks==='object')?j.oks:{}}}catch(e){}
+ if(ghTok()){try{const d=JSON.parse(localStorage.getItem('magsa-draft')||'null');if(d){edits=d.edits||{};dels=d.dels||{};if(d.oks)qOk=d.oks;dirty=true}}catch(e){}admin=true;DB=localDB;
   $('#role').insertAdjacentHTML('afterend','<button id="pub" class="adm" style="border:1px solid #ffc400;background:transparent;color:#ffc400;padding:7px 14px;border-radius:8px;cursor:pointer;font:inherit"></button>');
   $('#pub').onclick=async()=>{const b=$('#pub');if(!dirty)return toast('No hay cambios pendientes');b.disabled=true;toast('Publicando…');try{await publishEd();toast('Publicado. Los demás usuarios lo verán en 1–2 minutos')}catch(e){toast(e.message||'No se pudo publicar')}b.disabled=false};
   updPub()}
